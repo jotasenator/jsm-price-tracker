@@ -1,5 +1,6 @@
 import axios from "axios"
 import * as cheerio from 'cheerio'
+import { extractCurrency, extractPrice } from "../utils"
 
 export async function scrapeAmazonProduct(url: string) {
     if (!url) return
@@ -25,8 +26,55 @@ export async function scrapeAmazonProduct(url: string) {
     try {
         //fetch the product page
         const response = await axios.get(url, options)
-        console.log(response.data)
+        //console.log(response.data)
+        const $ = cheerio.load(response.data)
 
+        //extract the product title
+        const title = $('#productTitle').text().trim()
+
+        const currentPrice = extractPrice(
+            $('.priceToPay span.a-price-whole'),
+            $('.a.size.base.a-color-price'),
+            $('.a-button-selected .a-color-base'),
+        )
+        const originalPrice = extractPrice(
+            $('priceblock_ourprice'),
+            $('.a-price.a-text-price span.a-offscreen')
+        )
+        const outOfStock = $('#availability span').text().trim().toLowerCase()
+
+        const images = $('#imgBlkFront').attr('data-a-dynamic-image') || $('#landingImage').attr('data-a-dynamic-image') || '{}'
+        const imageUrls = Object.keys(JSON.parse(images));
+
+        const currency = extractCurrency($('.a-price-symbol'))
+
+        const discountRate = $('.savingsPercentage').text().replace(/[-%]/g, '')
+
+        // console.log({ title })
+        // console.log({ currentPrice })
+        // console.log({ originalPrice })
+        // console.log({ outOfStock })
+        // console.log({ image })
+        // console.log({ currency })
+        // console.log({ discountRate })
+
+        //construct data object with scraped information
+        const data = {
+            image: imageUrls[0],
+            url,
+            currency: currency || '$',
+            title,
+            currentPrice: Number(currentPrice),
+            originalPrice: Number(originalPrice),
+            priceHistory: [],
+            discountRate: Number(discountRate),
+            category: 'category',
+            isOutStock: outOfStock,
+        }
+
+        //console.log(data)
+
+        return data
 
     } catch (error: any) {
         throw new Error(`Failed to scrape product: ${error.message}`)
